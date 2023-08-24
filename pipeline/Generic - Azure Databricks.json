@@ -1,0 +1,555 @@
+{
+	"name": "Generic - Azure Databricks",
+	"properties": {
+		"activities": [
+			{
+				"name": "Get records to load into Azure Databricks",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "SELECT\n    MTC.*,\n    BS.ScheduleName\nFROM\n    [operation].[MetadataTableControl] MTC\nINNER JOIN\n    [operation].[BatchSchedule] BS ON MTC.BatchScheduleID = BS.BatchScheduleID\nWHERE\n    MTC.BatchProcessPhaseNameID = '@{pipeline().parameters.BatchProcessPhaseNameID}'\n    AND MTC.GroupLoad = '@{pipeline().parameters.GroupLoad}'\n    AND MTC.Active = 1\n    AND BS.Active = 1\n    AND BS.ScheduleName = '@{pipeline().parameters.ScheduleName}'",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "Load each file into Azure Databricks",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Get records to load into Azure Databricks",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Get records to load into Azure Databricks').output.value",
+						"type": "Expression"
+					},
+					"activities": [
+						{
+							"name": "Verify tables to load into Destination",
+							"type": "Lookup",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderQuery": {
+										"value": "SELECT DISTINCT\n    'Yes'                       AS ProcessTable,\n    BPTD.BatchProcessID         AS BatchProcessID\nFROM\n    [operation].[BatchProcessTableDetails] BPTD\nINNER JOIN\n    [operation].[MetadataTableControl] MTC ON BPTD.TableGroupNumber = MTC.TableGroupNumber\n    AND BPTD.BatchScheduleID = MTC.BatchScheduleID\nWHERE\n    BPTD.ActiveInBatchProcess = 1\n    AND BPTD.BatchProcessPhaseNameID = '@{pipeline().parameters.BatchProcessPhaseNameID}'\n    AND BPTD.BatchProcessID = '@{pipeline().parameters.BatchProcessID}'\n    AND MTC.GroupLoad = '@{pipeline().parameters.GroupLoad}'\n    AND MTC.FinalTableName = '@{item().FinalTableName}'\nUNION\nSELECT DISTINCT\n    'No'                        AS ProcessTable,\n    BPTD.BatchProcessID         AS BatchProcessID\nFROM\n    [operation].[BatchProcessTableDetails] BPTD\nINNER JOIN\n    [operation].[MetadataTableControl] MTC ON BPTD.TableGroupNumber = MTC.TableGroupNumber\n    AND BPTD.BatchScheduleID = MTC.BatchScheduleID\nWHERE\n    BPTD.ActiveInBatchProcess = 0\n    AND BPTD.BatchProcessPhaseNameID = '@{pipeline().parameters.BatchProcessPhaseNameID}'\n    AND BPTD.BatchProcessID = '@{pipeline().parameters.BatchProcessID}'\n    AND MTC.GroupLoad = '@{pipeline().parameters.GroupLoad}'\n    AND MTC.FinalTableName = '@{item().FinalTableName}'",
+										"type": "Expression"
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								}
+							}
+						},
+						{
+							"name": "if - Verify tables to load into Destination",
+							"type": "IfCondition",
+							"dependsOn": [
+								{
+									"activity": "Verify tables to load into Destination",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"expression": {
+									"value": "@if(equals(activity('Verify tables to load into Destination').output.firstrow.ProcessTable,'Yes'), 'True','False')",
+									"type": "Expression"
+								},
+								"ifTrueActivities": [
+									{
+										"name": "Get parameters to start log",
+										"type": "Lookup",
+										"dependsOn": [],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"source": {
+												"type": "AzureSqlSource",
+												"sqlReaderQuery": {
+													"value": "SELECT\n    2 AS InsertUpsert,\n    NULL AS BatchProcessID,\n    MTC.BatchProcessPhaseNameID,\n    PR.ProjectID,\n    MTC.BatchScheduleID,\n    BPSM.BatchProcessStatusNameID,\n    BPTD.ProcessTableName,\n    BPTD.TableGroupNumber,\n    MTC.GroupLoad\nFROM\n\t[operation].[ProjectName] PR\nINNER JOIN\n\t[operation].[BatchSchedule] BS ON PR.ProjectID = BS.ProjectID\nINNER JOIN\n\t[operation].[MetadataTableControl] MTC ON BS.BatchScheduleID = MTC.BatchScheduleID\nINNER JOIN\n    [operation].[BatchProcessTableDetails] BPTD ON MTC.TableGroupNumber = BPTD.TableGroupNumber\n    AND MTC.BatchProcessPhaseNameID = BPTD.BatchProcessPhaseNameID\nCROSS JOIN\n    [operation].[BatchProcessStatusName] BPSM\nWHERE\n    --Please check passed filters:\n    BPSM.BatchProcessStatusNameID = 10 --Status = 'Process running'\n    AND MTC.BatchProcessPhaseNameID = '@{pipeline().parameters.BatchProcessPhaseNameID}'\n    AND MTC.GroupLoad = '@{pipeline().parameters.GroupLoad}'\n    AND BPTD.ProcessTableName = '@{item().FinalTableName}'\n    AND BPTD.BatchProcessID = '@{pipeline().parameters.BatchProcessID}'",
+													"type": "Expression"
+												},
+												"queryTimeout": "02:00:00",
+												"partitionOption": "None"
+											}
+										}
+									},
+									{
+										"name": "Log start",
+										"type": "SqlServerStoredProcedure",
+										"dependsOn": [
+											{
+												"activity": "Get parameters to start log",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"storedProcedureName": "[operation].[BatchProcess_Upsert]",
+											"storedProcedureParameters": {
+												"BatchProcessID": {
+													"value": {
+														"value": "@pipeline().parameters.BatchProcessID",
+														"type": "Expression"
+													},
+													"type": "Int32"
+												},
+												"BatchProcessPhaseNameID": {
+													"value": {
+														"value": "@{activity('Get parameters to start log').output.firstRow.BatchProcessPhaseNameID}",
+														"type": "Expression"
+													},
+													"type": "Int16"
+												},
+												"BatchProcessStatusNameID": {
+													"value": {
+														"value": "@{activity('Get parameters to start log').output.firstRow.BatchProcessStatusNameID}",
+														"type": "Expression"
+													},
+													"type": "Int16"
+												},
+												"BatchScheduleID": {
+													"value": {
+														"value": "@{activity('Get parameters to start log').output.firstRow.BatchScheduleID}",
+														"type": "Expression"
+													},
+													"type": "Int16"
+												},
+												"InsertUpsert": {
+													"value": {
+														"value": "@{activity('Get parameters to start log').output.firstRow.InsertUpsert}",
+														"type": "Expression"
+													},
+													"type": "Int16"
+												},
+												"ProcessTableName": {
+													"value": {
+														"value": "@{activity('Get parameters to start log').output.firstRow.ProcessTableName}",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"ProjectID": {
+													"value": {
+														"value": "@{activity('Get parameters to start log').output.firstRow.ProjectID}",
+														"type": "Expression"
+													},
+													"type": "Int16"
+												},
+												"TableGroupNumber": {
+													"value": {
+														"value": "@{activity('Get parameters to start log').output.firstRow.TableGroupNumber}",
+														"type": "Expression"
+													},
+													"type": "Int16"
+												},
+												"BatchProcessIDOutPut": {
+													"value": 0,
+													"type": "Int32"
+												},
+												"DataRead": {
+													"value": "0",
+													"type": "Decimal"
+												},
+												"DataWritten": {
+													"value": "0",
+													"type": "Decimal"
+												},
+												"Throughput": {
+													"value": "0",
+													"type": "Decimal"
+												},
+												"RowsWritten": {
+													"value": "0",
+													"type": "Int32"
+												}
+											}
+										}
+									},
+									{
+										"name": "Get parameters to end log",
+										"type": "Lookup",
+										"dependsOn": [
+											{
+												"activity": "Run Databricks notebook",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"source": {
+												"type": "AzureSqlSource",
+												"sqlReaderQuery": {
+													"value": "SELECT\n    2 AS InsertUpsert,\n    NULL AS BatchProcessID,\n    MTC.BatchProcessPhaseNameID,\n    PR.ProjectID,\n    MTC.BatchScheduleID,\n    BPSM.BatchProcessStatusNameID,\n    BPTD.ProcessTableName,\n    BPTD.TableGroupNumber,\n    MTC.GroupLoad\nFROM\n\t[operation].[ProjectName] PR\nINNER JOIN\n\t[operation].[BatchSchedule] BS ON PR.ProjectID = BS.ProjectID\nINNER JOIN\n\t[operation].[MetadataTableControl] MTC ON BS.BatchScheduleID = MTC.BatchScheduleID\nINNER JOIN\n    [operation].[BatchProcessTableDetails] BPTD ON MTC.TableGroupNumber = BPTD.TableGroupNumber\n    AND MTC.BatchProcessPhaseNameID = BPTD.BatchProcessPhaseNameID\nCROSS JOIN\n    [operation].[BatchProcessStatusName] BPSM\nWHERE\n    --Please check passed filters:\n    BPSM.BatchProcessStatusNameID = 100 --\"End with success\"\n    AND MTC.BatchProcessPhaseNameID = '@{pipeline().parameters.BatchProcessPhaseNameID}'\n    AND MTC.GroupLoad = '@{pipeline().parameters.GroupLoad}'\n    AND BPTD.ProcessTableName = '@{item().FinalTableName}'\n    AND BPTD.BatchProcessID = '@{pipeline().parameters.BatchProcessID}'",
+													"type": "Expression"
+												},
+												"queryTimeout": "02:00:00",
+												"partitionOption": "None"
+											}
+										}
+									},
+									{
+										"name": "Get parameters to log error",
+										"type": "Lookup",
+										"dependsOn": [
+											{
+												"activity": "Run Databricks notebook",
+												"dependencyConditions": [
+													"Failed"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"source": {
+												"type": "AzureSqlSource",
+												"sqlReaderQuery": {
+													"value": "SELECT\n    2 AS InsertUpsert,\n    NULL AS BatchProcessID,\n    MTC.BatchProcessPhaseNameID,\n    PR.ProjectID,\n    MTC.BatchScheduleID,\n    BPSM.BatchProcessStatusNameID,\n    BPTD.ProcessTableName,\n    BPTD.TableGroupNumber,\n    MTC.GroupLoad\nFROM\n\t[operation].[ProjectName] PR\nINNER JOIN\n\t[operation].[BatchSchedule] BS ON PR.ProjectID = BS.ProjectID\nINNER JOIN\n\t[operation].[MetadataTableControl] MTC ON BS.BatchScheduleID = MTC.BatchScheduleID\nINNER JOIN\n    [operation].[BatchProcessTableDetails] BPTD ON MTC.TableGroupNumber = BPTD.TableGroupNumber\n    AND MTC.BatchProcessPhaseNameID = BPTD.BatchProcessPhaseNameID\nCROSS JOIN\n    [operation].[BatchProcessStatusName] BPSM\nWHERE\n    --Please check passed filters:\n    BPSM.BatchProcessStatusNameID = 20 --\"End with error\"\n    AND MTC.BatchProcessPhaseNameID = '@{pipeline().parameters.BatchProcessPhaseNameID}'\n    AND MTC.GroupLoad = '@{pipeline().parameters.GroupLoad}'\n    AND BPTD.ProcessTableName = '@{item().FinalTableName}'\n    AND BPTD.BatchProcessID = '@{pipeline().parameters.BatchProcessID}'",
+													"type": "Expression"
+												},
+												"queryTimeout": "02:00:00",
+												"partitionOption": "None"
+											}
+										}
+									},
+									{
+										"name": "Log end",
+										"type": "SqlServerStoredProcedure",
+										"dependsOn": [
+											{
+												"activity": "Get parameters to end log",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"storedProcedureName": "[operation].[BatchProcess_Upsert]",
+											"storedProcedureParameters": {
+												"BatchProcessID": {
+													"value": {
+														"value": "@pipeline().parameters.BatchProcessID",
+														"type": "Expression"
+													},
+													"type": "Int32"
+												},
+												"BatchProcessPhaseNameID": {
+													"value": {
+														"value": "@{activity('Get parameters to end log').output.firstRow.BatchProcessPhaseNameID}",
+														"type": "Expression"
+													},
+													"type": "Int16"
+												},
+												"BatchProcessStatusNameID": {
+													"value": {
+														"value": "@{activity('Get parameters to end log').output.firstRow.BatchProcessStatusNameID}",
+														"type": "Expression"
+													},
+													"type": "Int16"
+												},
+												"BatchScheduleID": {
+													"value": {
+														"value": "@{activity('Get parameters to end log').output.firstRow.BatchScheduleID}",
+														"type": "Expression"
+													},
+													"type": "Int16"
+												},
+												"InsertUpsert": {
+													"value": {
+														"value": "@{activity('Get parameters to end log').output.firstRow.InsertUpsert}",
+														"type": "Expression"
+													},
+													"type": "Int16"
+												},
+												"ProcessTableName": {
+													"value": {
+														"value": "@{activity('Get parameters to end log').output.firstRow.ProcessTableName}",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"ProjectID": {
+													"value": {
+														"value": "@{activity('Get parameters to end log').output.firstRow.ProjectID}",
+														"type": "Expression"
+													},
+													"type": "Int16"
+												},
+												"TableGroupNumber": {
+													"value": {
+														"value": "@{activity('Get parameters to end log').output.firstRow.TableGroupNumber}",
+														"type": "Expression"
+													},
+													"type": "Int16"
+												},
+												"BatchProcessIDOutPut": {
+													"value": 0,
+													"type": "Int32"
+												},
+												"DataRead": {
+													"value": "0",
+													"type": "Decimal"
+												},
+												"DataWritten": {
+													"value": "0",
+													"type": "Decimal"
+												},
+												"Throughput": {
+													"value": "0",
+													"type": "Decimal"
+												},
+												"RowsWritten": {
+													"value": "0",
+													"type": "Int32"
+												}
+											}
+										}
+									},
+									{
+										"name": "Log error",
+										"type": "SqlServerStoredProcedure",
+										"dependsOn": [
+											{
+												"activity": "Get parameters to log error",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"storedProcedureName": "[operation].[BatchProcess_Upsert]",
+											"storedProcedureParameters": {
+												"BatchProcessID": {
+													"value": {
+														"value": "@pipeline().parameters.BatchProcessID",
+														"type": "Expression"
+													},
+													"type": "Int32"
+												},
+												"BatchProcessPhaseNameID": {
+													"value": {
+														"value": "@{activity('Get parameters to log error').output.firstRow.BatchProcessPhaseNameID}",
+														"type": "Expression"
+													},
+													"type": "Int16"
+												},
+												"BatchProcessStatusNameID": {
+													"value": {
+														"value": "@{activity('Get parameters to log error').output.firstRow.BatchProcessStatusNameID}",
+														"type": "Expression"
+													},
+													"type": "Int16"
+												},
+												"BatchScheduleID": {
+													"value": {
+														"value": "@{activity('Get parameters to log error').output.firstRow.BatchScheduleID}",
+														"type": "Expression"
+													},
+													"type": "Int16"
+												},
+												"InsertUpsert": {
+													"value": {
+														"value": "@{activity('Get parameters to log error').output.firstRow.InsertUpsert}",
+														"type": "Expression"
+													},
+													"type": "Int16"
+												},
+												"ProcessTableName": {
+													"value": {
+														"value": "@{activity('Get parameters to log error').output.firstRow.ProcessTableName}",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"ProjectID": {
+													"value": {
+														"value": "@{activity('Get parameters to log error').output.firstRow.ProjectID}",
+														"type": "Expression"
+													},
+													"type": "Int16"
+												},
+												"TableGroupNumber": {
+													"value": {
+														"value": "@{activity('Get parameters to log error').output.firstRow.TableGroupNumber}",
+														"type": "Expression"
+													},
+													"type": "Int16"
+												},
+												"BatchProcessIDOutPut": {
+													"value": 0,
+													"type": "Int32"
+												},
+												"DataRead": {
+													"value": "0",
+													"type": "Decimal"
+												},
+												"DataWritten": {
+													"value": "0",
+													"type": "Decimal"
+												},
+												"Throughput": {
+													"value": "0",
+													"type": "Decimal"
+												},
+												"RowsWritten": {
+													"value": "0",
+													"type": "Int32"
+												}
+											}
+										}
+									},
+									{
+										"name": "Run Databricks notebook",
+										"type": "DatabricksNotebook",
+										"dependsOn": [
+											{
+												"activity": "Log start",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"notebookPath": {
+												"value": "@{concat(item().DestinationControl2,item().DestinationControl3)}",
+												"type": "Expression"
+											},
+											"baseParameters": {
+												"FileSourcePath": {
+													"value": "@{concat(item().SourceControl2,item().SourceControl3)}",
+													"type": "Expression"
+												},
+												"FileDestinationPath": {
+													"value": "@item().DestinationControl4",
+													"type": "Expression"
+												}
+											}
+										}
+									}
+								]
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"BatchProcessID": {
+				"type": "int",
+				"defaultValue": 0
+			},
+			"SecretName": {
+				"type": "string",
+				"defaultValue": "SecretName"
+			},
+			"ScheduleName": {
+				"type": "string",
+				"defaultValue": "ScheduleName"
+			},
+			"BatchProcessPhaseNameID": {
+				"type": "int",
+				"defaultValue": 0
+			},
+			"GroupLoad": {
+				"type": "string",
+				"defaultValue": "GroupLoad"
+			},
+			"OperationKeyVaultURI": {
+				"type": "string",
+				"defaultValue": "OperationKeyVaultURI"
+			}
+		},
+		"folder": {
+			"name": "Pipeline Templates/Databricks"
+		},
+		"annotations": [],
+		"lastPublishTime": "2023-02-08T15:17:03Z"
+	},
+	"type": "Microsoft.Synapse/workspaces/pipelines"
+}
