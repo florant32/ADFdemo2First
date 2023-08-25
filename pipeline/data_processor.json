@@ -1,0 +1,345 @@
+{
+	"name": "data_processor",
+	"properties": {
+		"activities": [
+			{
+				"name": "MoveFile",
+				"type": "Copy",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.01:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "DelimitedTextSource",
+						"storeSettings": {
+							"type": "AzureBlobFSReadSettings",
+							"recursive": true,
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "DelimitedTextReadSettings"
+						}
+					},
+					"sink": {
+						"type": "DelimitedTextSink",
+						"storeSettings": {
+							"type": "AzureBlobFSWriteSettings"
+						},
+						"formatSettings": {
+							"type": "DelimitedTextWriteSettings",
+							"quoteAllText": true,
+							"fileExtension": ".txt"
+						}
+					},
+					"enableStaging": false
+				}
+			},
+			{
+				"name": "DatabricksCuster",
+				"type": "DatabricksNotebook",
+				"dependsOn": [
+					{
+						"activity": "MoveFile",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.01:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"notebookPath": {
+						"value": "@pipeline().parameters.NotebookPath",
+						"type": "Expression"
+					},
+					"baseParameters": {
+						"file_name": {
+							"value": "@pipeline().parameters.DestinationFile",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Copy Into",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "DatabricksCuster",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.01:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": {
+						"value": "@pipeline().parameters.CopyIntoProcedure",
+						"type": "Expression"
+					},
+					"storedProcedureParameters": {
+						"TargetTable": {
+							"value": {
+								"value": "@pipeline().parameters.TargetTable",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"DWDPath": {
+							"value": {
+								"value": "@activity('DatabricksCuster').output.runOutput.dwd_path",
+								"type": "Expression"
+							},
+							"type": "String"
+						}
+					}
+				}
+			},
+			{
+				"name": "MoveFile Log",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "MoveFile",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.00:03:00",
+					"retry": 1,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[dbo].[usp_UpdatePipelineLog]",
+					"storedProcedureParameters": {
+						"Message": {
+							"value": null,
+							"type": "String"
+						},
+						"PipelineRuntimeID": {
+							"value": {
+								"value": "@pipeline().RunId",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"BatchRuntimeID": {
+							"value": {
+								"value": "@pipeline().parameters.BatchRuntimeID",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"PipelineName": {
+							"value": {
+								"value": "@pipeline().parameters.PipelineName",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"TraceName": {
+							"value": "MoveFile",
+							"type": "String"
+						},
+						"TraceValue": {
+							"value": {
+								"value": "@string(activity('MoveFile').output)",
+								"type": "Expression"
+							},
+							"type": "String"
+						}
+					}
+				}
+			},
+			{
+				"name": "Databricks Log",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "DatabricksCuster",
+						"dependencyConditions": [
+							"Completed"
+						]
+					},
+					{
+						"activity": "MoveFile Log",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.00:03:00",
+					"retry": 1,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[dbo].[usp_UpdatePipelineLog]",
+					"storedProcedureParameters": {
+						"Message": {
+							"value": null,
+							"type": "String"
+						},
+						"PipelineRuntimeID": {
+							"value": {
+								"value": "@pipeline().RunId",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"BatchRuntimeID": {
+							"value": {
+								"value": "@pipeline().parameters.BatchRuntimeID",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"PipelineName": {
+							"value": {
+								"value": "@pipeline().parameters.PipelineName",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"TraceName": {
+							"value": "DatabricksCuster",
+							"type": "String"
+						},
+						"TraceValue": {
+							"value": {
+								"value": "@string(activity('DatabricksCuster').output)",
+								"type": "Expression"
+							},
+							"type": "String"
+						}
+					}
+				}
+			},
+			{
+				"name": "Copy Into Log",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Copy Into",
+						"dependencyConditions": [
+							"Completed"
+						]
+					},
+					{
+						"activity": "Databricks Log",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.00:03:00",
+					"retry": 1,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[dbo].[usp_UpdatePipelineLog]",
+					"storedProcedureParameters": {
+						"Message": {
+							"value": null,
+							"type": "String"
+						},
+						"PipelineRuntimeID": {
+							"value": {
+								"value": "@pipeline().RunId",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"BatchRuntimeID": {
+							"value": {
+								"value": "@pipeline().parameters.BatchRuntimeID",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"PipelineName": {
+							"value": {
+								"value": "@pipeline().parameters.PipelineName",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"TraceName": {
+							"value": "Copy Into",
+							"type": "String"
+						},
+						"TraceValue": {
+							"value": {
+								"value": "@string(activity('Copy Into').output)",
+								"type": "Expression"
+							},
+							"type": "String"
+						}
+					}
+				}
+			}
+		],
+		"parameters": {
+			"SourceFile": {
+				"type": "string",
+				"defaultValue": "Product.csv"
+			},
+			"DestinationFile": {
+				"type": "string",
+				"defaultValue": "Product.csv"
+			},
+			"NotebookPath": {
+				"type": "string",
+				"defaultValue": "/Demo3/ProcessData"
+			},
+			"CopyIntoProcedure": {
+				"type": "string",
+				"defaultValue": "demo.usp_CopyData"
+			},
+			"TargetTable": {
+				"type": "string",
+				"defaultValue": "demo.Product"
+			},
+			"BatchRuntimeID": {
+				"type": "string"
+			},
+			"PipelineName": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"lastPublishTime": "2022-03-19T06:07:33Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}
