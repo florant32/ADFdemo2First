@@ -1,0 +1,51 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "factoryName": {
+            "value": "ADFDataLakeAccelerator"
+        },
+        "ls_teste_accountKey": {
+            "value": ""
+        },
+        "ls_GenericAnonymousHTTP_properties_typeProperties_url": {
+            "value": "@{linkedService().BaseURL}"
+        },
+        "ls_AzureKeyVault_properties_typeProperties_baseUrl": {
+            "value": "@{linkedService().KeyVaultURI}"
+        },
+        "ls_OperationAzureDB_properties_typeProperties_connectionString_secretName": {
+            "value": "@linkedService().SecretName"
+        },
+        "ls_GenericAzureDatabricks_properties_typeProperties_existingClusterId": {
+            "value": "@linkedService().ClusterID"
+        },
+        "ls_GenericPostgresSQLAzureDatabase_properties_typeProperties_connectionString_secretName": {
+            "value": "@linkedService().SecretName"
+        },
+        "ls_GenericAzureDatabase_properties_typeProperties_connectionString_secretName": {
+            "value": "@linkedService().SecretName"
+        },
+        "ls_SQLServer_Onpremises_properties_typeProperties_connectionString_secretName": {
+            "value": "@linkedService().SecretName"
+        },
+        "ls_GenericADL2_properties_typeProperties_url": {
+            "value": "https://@{linkedService().StorageAccount}.dfs.core.windows.net"
+        },
+        "ls_GenericAzureCosmosDBMongo_properties_typeProperties_connectionString_secretName": {
+            "value": "@linkedService().SecretName"
+        },
+        "ls_GenericAzureCosmosDBMongo_properties_typeProperties_database": {
+            "value": "@linkedService().DatabaseName"
+        },
+        "ls_GenericMySQLAzureDatabase_properties_typeProperties_connectionString_secretName": {
+            "value": "@linkedService().SecretName"
+        },
+        "ls_GenericAzureSynapse_properties_typeProperties_connectionString_secretName": {
+            "value": "@linkedService().SecretName"
+        },
+        "ls_teste_properties_typeProperties_url": {
+            "value": "https://transsynapsestorage.dfs.core.windows.net/"
+        }
+    }
+}
