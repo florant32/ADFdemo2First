@@ -1,0 +1,47 @@
+{
+	"name": "TestPipeline2",
+	"properties": {
+		"activities": [
+			{
+				"name": "Wait-time",
+				"type": "Wait",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"waitTimeInSeconds": 5
+				}
+			},
+			{
+				"name": "Variables",
+				"type": "AppendVariable",
+				"dependsOn": [
+					{
+						"activity": "Wait-time",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "TestValue",
+					"value": "[1,2,3,4,5,6,7]"
+				}
+			}
+		],
+		"variables": {
+			"TestValue": {
+				"type": "Array",
+				"defaultValue": [
+					1,
+					2,
+					3,
+					4,
+					5,
+					6
+				]
+			}
+		},
+		"annotations": []
+	}
+}
