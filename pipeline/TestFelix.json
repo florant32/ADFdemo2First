@@ -10,6 +10,27 @@
 				"typeProperties": {
 					"waitTimeInSeconds": 60
 				}
+			},
+			{
+				"name": "TestFelix",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Wait1",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "pipelineReturnValue",
+					"setSystemVariable": true
+				}
 			}
 		],
 		"annotations": []
