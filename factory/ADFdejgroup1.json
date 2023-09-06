@@ -1,0 +1,9 @@
+{
+	"name": "ADFdejgroup1",
+	"location": "canadacentral",
+	"identity": {
+		"type": "SystemAssigned",
+		"principalId": "21a5471e-44e4-4533-a6c6-4f4274d8ebc0",
+		"tenantId": "16b3c013-d300-468d-ac64-7eda0820b6d3"
+	}
+}
