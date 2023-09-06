@@ -4,6 +4,15 @@
 	"parameters": {
 		"factoryName": {
 			"value": "ADFDEVFelix"
+		},
+		"AzureBlobStorageDejgrope1_connectionString": {
+			"value": ""
+		},
+		"AzureDataLakeAbdel_accountKey": {
+			"value": ""
+		},
+		"AzureDataLakeAbdel_properties_typeProperties_url": {
+			"value": "https://storagedejgroup1.dfs.core.windows.net/"
 		}
 	}
 }

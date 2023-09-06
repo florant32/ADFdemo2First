@@ -7,6 +7,18 @@
 			"metadata": "Data Factory name",
 			"defaultValue": "ADFDEVFelix"
 		},
+		"AzureBlobStorageDejgrope1_connectionString": {
+			"type": "secureString",
+			"metadata": "Secure string for 'connectionString' of 'AzureBlobStorageDejgrope1'"
+		},
+		"AzureDataLakeAbdel_accountKey": {
+			"type": "secureString",
+			"metadata": "Secure string for 'accountKey' of 'AzureDataLakeAbdel'"
+		},
+		"AzureDataLakeAbdel_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "https://storagedejgroup1.dfs.core.windows.net/"
+		},
 		"containerUri": {
 			"type": "string",
 			"metadata": "URI to storage account containing linked ARM templates"
@@ -33,6 +45,15 @@
 				"parameters": {
 					"factoryName": {
 						"value": "[parameters('factoryName')]"
+					},
+					"AzureBlobStorageDejgrope1_connectionString": {
+						"value": "[parameters('AzureBlobStorageDejgrope1_connectionString')]"
+					},
+					"AzureDataLakeAbdel_accountKey": {
+						"value": "[parameters('AzureDataLakeAbdel_accountKey')]"
+					},
+					"AzureDataLakeAbdel_properties_typeProperties_url": {
+						"value": "[parameters('AzureDataLakeAbdel_properties_typeProperties_url')]"
 					}
 				}
 			},
