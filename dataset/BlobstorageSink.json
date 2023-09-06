@@ -1,0 +1,22 @@
+{
+	"name": "BlobstorageSink",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "AzureBlobStorageDejgrope1",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "DelimitedText",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobStorageLocation",
+				"container": "uat"
+			},
+			"columnDelimiter": ",",
+			"escapeChar": "\\",
+			"firstRowAsHeader": true,
+			"quoteChar": "\""
+		},
+		"schema": []
+	}
+}
