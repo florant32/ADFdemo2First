@@ -28,11 +28,16 @@
 				},
 				"userProperties": [],
 				"typeProperties": {
-					"variableName": "pipelineReturnValue",
-					"setSystemVariable": true
+					"variableName": "dst",
+					"value": ""
 				}
 			}
 		],
+		"variables": {
+			"dst": {
+				"type": "String"
+			}
+		},
 		"annotations": []
 	}
 }

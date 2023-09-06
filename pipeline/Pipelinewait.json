@@ -28,11 +28,19 @@
 				},
 				"userProperties": [],
 				"typeProperties": {
-					"variableName": "pipelineReturnValue",
-					"setSystemVariable": true
+					"variableName": "data",
+					"value": ""
 				}
 			}
 		],
+		"variables": {
+			"data": {
+				"type": "String"
+			},
+			"dst": {
+				"type": "String"
+			}
+		},
 		"annotations": [],
 		"lastPublishTime": "2023-09-06T15:17:03Z"
 	},
